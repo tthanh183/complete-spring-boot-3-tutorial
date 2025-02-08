@@ -37,6 +37,9 @@ public class SecurityConfig {
     // 3. Instead of using hasAuthority("ROLE_ADMIN"), we can use hasRole("ADMIN").
     // Spring Security automatically adds the "ROLE_" prefix when using hasRole(),
     // so hasRole("ADMIN") is equivalent to hasAuthority("ROLE_ADMIN").
+    // 5. The 401 Unauthorized error occurs during authentication, before the request reaches the service/controller layer.
+    // Since it happens at the security filter level, it is not handled by the Global Exception Handler.
+    // Instead, we handle it using AuthenticationEntryPoint in the security configuration.
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity httpSecurity) throws Exception {
         httpSecurity
@@ -44,7 +47,8 @@ public class SecurityConfig {
 //                        .requestMatchers(HttpMethod.GET, "/users").hasRole(Role.ADMIN.name())
                         .anyRequest().authenticated());
         httpSecurity.oauth2ResourceServer(oauth2 -> oauth2.jwt(jwtConfigurer -> jwtConfigurer.decoder(jwtDecoder())
-                .jwtAuthenticationConverter(jwtAuthenticationConverter())));
+                .jwtAuthenticationConverter(jwtAuthenticationConverter()))
+                .authenticationEntryPoint(new JwtAuthenticationEntryPoint()));
 
         httpSecurity.csrf(AbstractHttpConfigurer::disable);
         return httpSecurity.build();

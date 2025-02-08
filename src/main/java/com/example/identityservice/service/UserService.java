@@ -50,7 +50,7 @@ public class UserService {
         return userMapper.toUserResponse(user);
     }
 
-    // 1. @PreAuthorize is used to check permissions **before** executing the method.
+    // 4. @PreAuthorize is used to check permissions **before** executing the method.
     // - "hasRole('ADMIN')" ensures that only users with the "ADMIN" role can access this method.
     // - Since Spring Security automatically adds the "ROLE_" prefix when using hasRole(),
     //   "hasRole('ADMIN')" is equivalent to "hasAuthority('ROLE_ADMIN')".
@@ -60,7 +60,7 @@ public class UserService {
         return userRepository.findAll().stream().map(userMapper::toUserResponse).toList();
     }
 
-    // 2. @PostAuthorize is used to check permissions **after** executing the method.
+    // 4. @PostAuthorize is used to check permissions **after** executing the method.
     // - "returnObject.username == principal.username" allows users to access their own data.
     // - "or hasRole('ADMIN')" ensures that ADMIN users can access any user’s data.
     // - Unlike @PreAuthorize, this annotation runs after the method executes, meaning:
