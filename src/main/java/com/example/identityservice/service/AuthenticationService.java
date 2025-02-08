@@ -67,12 +67,14 @@ public class AuthenticationService {
     }
 
     // 1. By default, OAuth2 systems store role information in the "scope" claim within the JWT payload.
-    // The "scope" claim contains a space-separated list of roles assigned to the user.
-    // When decoding the token, Spring Security automatically extracts these roles
-    // and maps them into the user's granted authorities.
-    // Additionally, the AuthenticationManager prefixes each role with "SCOPE_",
-    // resulting in authorities like "SCOPE_USER" and "SCOPE_ADMIN".
-    // This is a common practice in OAuth2 systems to prevent naming conflicts with other authorities.
+    //    - The "scope" claim contains a space-separated list of roles assigned to the user.
+    //    - When decoding the token, Spring Security extracts these roles and maps them into the user's granted authorities.
+    //    - However, by default, Spring Security prefixes each extracted role with "SCOPE_".
+    //      For example, if the JWT contains:
+    //      { "scope": "USER ADMIN" }
+    //      The granted authorities will be:
+    //      ["SCOPE_USER", "SCOPE_ADMIN"].
+    //    - This default behavior is intended to prevent conflicts with other authority types.
     private String generateToken(User user) {
         JWSHeader header = new JWSHeader(JWSAlgorithm.HS512);
         JWTClaimsSet jwsClaimSet = new JWTClaimsSet.Builder()
@@ -96,9 +98,9 @@ public class AuthenticationService {
 
     private String buildScope(User user) {
         StringJoiner stringJoiner = new StringJoiner(" ");
-//        if(!CollectionUtils.isEmpty(user.getRoles())) {
-//            user.getRoles().forEach(stringJoiner::add);
-//        }
+        if(!CollectionUtils.isEmpty(user.getRoles())) {
+            user.getRoles().forEach(role -> stringJoiner.add(role.getName()));
+        }
         return stringJoiner.toString();
     }
 

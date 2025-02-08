@@ -8,6 +8,7 @@ import com.example.identityservice.enums.Role;
 import com.example.identityservice.exception.AppException;
 import com.example.identityservice.exception.ErrorCode;
 import com.example.identityservice.mapper.UserMapper;
+import com.example.identityservice.repository.RoleRepository;
 import com.example.identityservice.repository.UserRepository;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +31,8 @@ public class UserService {
     UserRepository userRepository;
     UserMapper userMapper;
     PasswordEncoder passwordEncoder;
+    RoleRepository roleRepository;
+
     public UserResponse createUser(UserCreationRequest request) {
         if(userRepository.existsByUsername(request.getUsername())) {
             throw new AppException(ErrorCode.USER_EXISTED);
@@ -50,23 +53,16 @@ public class UserService {
         return userMapper.toUserResponse(user);
     }
 
-    // 4. @PreAuthorize is used to check permissions **before** executing the method.
-    // - "hasRole('ADMIN')" ensures that only users with the "ADMIN" role can access this method.
-    // - Since Spring Security automatically adds the "ROLE_" prefix when using hasRole(),
-    //   "hasRole('ADMIN')" is equivalent to "hasAuthority('ROLE_ADMIN')".
-    // - If the user does not have the required role, access is denied before executing the method.
+    // 5. @PreAuthorize is used to check permissions **before** executing the method:
+    //    - Example: `@PreAuthorize("hasRole('ADMIN')")`
+    //    - Spring Security automatically **adds the "ROLE_" prefix** when using `hasRole()`.
+    //      - So `hasRole('ADMIN')` is equivalent to `hasAuthority('ROLE_ADMIN')`.
+    //    - If the user does not have the required role, access is denied **before** the method executes.
     @PreAuthorize("hasRole('ADMIN')")
     public List<UserResponse> getUsers() {
         return userRepository.findAll().stream().map(userMapper::toUserResponse).toList();
     }
 
-    // 4. @PostAuthorize is used to check permissions **after** executing the method.
-    // - "returnObject.username == principal.username" allows users to access their own data.
-    // - "or hasRole('ADMIN')" ensures that ADMIN users can access any user’s data.
-    // - Unlike @PreAuthorize, this annotation runs after the method executes, meaning:
-    //   - The method fetches the user data first.
-    //   - Then, Spring Security checks if the returned user is the same as the authenticated user or an ADMIN.
-    //   - If neither condition is met, access is denied, and the response is not returned.
     @PostAuthorize("returnObject.username == authentication.name or hasRole('ADMIN')")
     public UserResponse getUser(String userId) {
         return userMapper.toUserResponse(userRepository.findById(userId).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED)));
@@ -75,6 +71,11 @@ public class UserService {
     public UserResponse updateUser(String userId, UserUpdateRequest request) {
         User user = userRepository.findById(userId).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
         userMapper.updateUser(user, request);
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
+
+        var roles = roleRepository.findAllById(request.getRoles());
+        user.setRoles(new HashSet<>(roles));
+
         return userMapper.toUserResponse(userRepository.save(user));
     }
 

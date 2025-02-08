@@ -34,12 +34,40 @@ public class SecurityConfig {
     private String signerKey;
 
 
-    // 3. Instead of using hasAuthority("ROLE_ADMIN"), we can use hasRole("ADMIN").
-    // Spring Security automatically adds the "ROLE_" prefix when using hasRole(),
-    // so hasRole("ADMIN") is equivalent to hasAuthority("ROLE_ADMIN").
-    // 5. The 401 Unauthorized error occurs during authentication, before the request reaches the service/controller layer.
-    // Since it happens at the security filter level, it is not handled by the Global Exception Handler.
-    // Instead, we handle it using AuthenticationEntryPoint in the security configuration.
+    // 3. Role-based authorization in Spring Security works as follows:
+    //    - Spring Security differentiates between "roles" and "authorities":
+    //      - A **role** is a high-level security designation (e.g., "ADMIN", "USER").
+    //      - An **authority** is a more general permission, which can include roles (e.g., "SCOPE_ADMIN").
+    //    - The `hasRole("ADMIN")` function automatically **adds the "ROLE_" prefix** before checking permissions.
+    //      - `hasRole("ADMIN")` → Internally checks for `"ROLE_ADMIN"` authority.
+    //      - `hasAuthority("SCOPE_ADMIN")` → Directly checks for `"SCOPE_ADMIN"` authority.
+    // 4. Impact of different authority prefixes:
+    //    - By default, Spring Security prefixes authorities extracted from the JWT **with "SCOPE_"**.
+    //      - Example: If the JWT contains { "scope": "ADMIN USER" }, the granted authorities will be:
+    //        ["SCOPE_ADMIN", "SCOPE_USER"].
+    //      - This means:
+    //        - ✅ `hasAuthority("SCOPE_ADMIN")` works correctly.
+    //        - ❌ `hasRole("ADMIN")` will **fail**, because it checks for `"ROLE_ADMIN"`, not `"SCOPE_ADMIN"`.
+    //
+    //    - If we configure `setAuthorityPrefix("ROLE_")`, then authorities will be prefixed with `"ROLE_"` instead:
+    //      - Example: { "scope": "ADMIN USER" } → Granted authorities: ["ROLE_ADMIN", "ROLE_USER"].
+    //      - This ensures consistency with Spring Security’s role handling, so:
+    //        - ✅ `hasAuthority("ROLE_ADMIN")` works correctly.
+    //        - ✅ `hasRole("ADMIN")` works correctly, because it internally checks for `"ROLE_ADMIN"`.
+    //
+    //    - If we set `setAuthorityPrefix("")` (empty string), then authorities will be stored exactly as they appear in the JWT:
+    //      - Example: { "scope": "ADMIN USER" } → Granted authorities: ["ADMIN", "USER"].
+    //      - In this case:
+    //        - ✅ `hasAuthority("ADMIN")` works correctly.
+    //        - ❌ `hasRole("ADMIN")` **fails**, because `hasRole()` checks for `"ROLE_ADMIN"`, which doesn't exist.
+    //
+    //    - **Best Practice:**
+    //      - **Use `setAuthorityPrefix("ROLE_")`** to ensure compatibility with `hasRole()`.
+    //      - If roles in JWT already have a `"ROLE_"` prefix, set `setAuthorityPrefix("")` to prevent duplication (e.g., `"ROLE_ROLE_ADMIN"`).
+    // 6. Why 401 Unauthorized errors are not handled by Global Exception Handler:
+    //    - 401 errors occur **during authentication**, which happens at the filter level before reaching the controller/service.
+    //    - Since global exception handlers work at the controller layer, they do not catch authentication failures.
+    //    - To handle 401 errors, you must define an `AuthenticationEntryPoint` in Spring Security’s configuration.
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity httpSecurity) throws Exception {
         httpSecurity
@@ -56,9 +84,12 @@ public class SecurityConfig {
 
 
     // 2. jwtGrantedAuthoritiesConverter provides methods to customize role mapping from JWT:
-    // - setAuthorityPrefix: Changes the default "SCOPE_" prefix for authorities.
-    // - setAuthorityClaimDelimiter: Defines a custom delimiter for separating multiple roles (default is a space).
-    // - setAuthorityClaimName: Sets a custom claim name instead of the default "scope" to extract roles.
+    //    - setAuthorityPrefix(String prefix): Changes the default "SCOPE_" prefix.
+    //      - If set to "ROLE_", it ensures authorities align with Spring Security’s role convention.
+    //      - If set to "", extracted values remain unchanged.
+    //    - setAuthorityClaimDelimiter(String delimiter): Defines a custom delimiter for separating multiple roles.
+    //      - Default is a space (" ").
+    //    - setAuthorityClaimName(String claimName): Specifies a custom claim name (default is "scope") to extract roles.
     @Bean
     JwtAuthenticationConverter jwtAuthenticationConverter() {
         JwtGrantedAuthoritiesConverter jwtGrantedAuthoritiesConverter = new JwtGrantedAuthoritiesConverter();
