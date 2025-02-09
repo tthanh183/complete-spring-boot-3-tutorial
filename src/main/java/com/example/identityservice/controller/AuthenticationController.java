@@ -39,7 +39,7 @@ public class AuthenticationController {
     @PostMapping("/logout")
     public ApiResponse<String> logout(@RequestBody RefreshRequest request) {
         authenticationService.logout(request);
-        return ApiResponse.<String>builder().result("Logged out").build();
+        return ApiResponse.<String>builder().message("Logged out").build();
     }
 
     @PostMapping("/introspect")
