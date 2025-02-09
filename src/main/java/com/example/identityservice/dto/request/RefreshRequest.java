@@ -1,15 +1,13 @@
-package com.example.identityservice.dto.response;
+package com.example.identityservice.dto.request;
 
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class AuthenticationResponse {
-    String accessToken;
+public class RefreshRequest {
     String refreshToken;
-    boolean authenticated;
 }
