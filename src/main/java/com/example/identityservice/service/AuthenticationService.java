@@ -2,11 +2,14 @@ package com.example.identityservice.service;
 
 import com.example.identityservice.dto.request.AuthenticationRequest;
 import com.example.identityservice.dto.request.IntrospectRequest;
+import com.example.identityservice.dto.request.LogoutRequest;
 import com.example.identityservice.dto.response.AuthenticationResponse;
 import com.example.identityservice.dto.response.IntrospectResponse;
+import com.example.identityservice.entity.InvalidatedToken;
 import com.example.identityservice.entity.User;
 import com.example.identityservice.exception.AppException;
 import com.example.identityservice.exception.ErrorCode;
+import com.example.identityservice.repository.InvalidatedTokenRepository;
 import com.example.identityservice.repository.UserRepository;
 import com.nimbusds.jose.*;
 import com.nimbusds.jose.crypto.MACSigner;
@@ -29,6 +32,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import java.util.StringJoiner;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -36,18 +40,22 @@ import java.util.StringJoiner;
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class AuthenticationService {
     UserRepository userRepository;
+    InvalidatedTokenRepository invalidatedTokenRepository;
+
     @NonFinal
     @Value("${jwt.signerKey}")
     protected String SIGNER_KEY;
 
     public IntrospectResponse introspect(IntrospectRequest request) throws JOSEException, ParseException {
         var token = request.getToken();
-        JWSVerifier verifier = new MACVerifier(SIGNER_KEY.getBytes());
-        SignedJWT signedJWT = SignedJWT.parse(token);
-        Date expiryTime = signedJWT.getJWTClaimsSet().getExpirationTime();
-        var verified = signedJWT.verify(verifier);
+        boolean isValid = true;
+        try {
+            verifyToken(token);
+        } catch (AppException e) {
+            isValid = false;
+        }
         return IntrospectResponse.builder()
-                .valid(verified && expiryTime.after(new Date()))
+                .valid(isValid)
                 .build();
     }
 
@@ -66,6 +74,34 @@ public class AuthenticationService {
                 .build();
     }
 
+    public void logout(LogoutRequest request) throws ParseException, JOSEException {
+        var signedJWT = verifyToken(request.getToken());
+        String jit = signedJWT.getJWTClaimsSet().getJWTID();
+        Date expiryTime = signedJWT.getJWTClaimsSet().getExpirationTime();
+        InvalidatedToken invalidatedToken = InvalidatedToken.builder()
+                .id(jit)
+                .expiryTime(expiryTime)
+                .build();
+        invalidatedTokenRepository.save(invalidatedToken);
+    }
+
+    private SignedJWT verifyToken(String token) throws ParseException, JOSEException {
+        JWSVerifier verifier = new MACVerifier(SIGNER_KEY.getBytes());
+        SignedJWT signedJWT = SignedJWT.parse(token);
+        Date expiryTime = signedJWT.getJWTClaimsSet().getExpirationTime();
+        var verified = signedJWT.verify(verifier);
+
+        if(!verified || expiryTime.before(new Date())) {
+            throw new AppException(ErrorCode.UNAUTHENTICATED);
+        }
+
+        if(invalidatedTokenRepository.existsById(signedJWT.getJWTClaimsSet().getJWTID())) {
+            throw new AppException(ErrorCode.UNAUTHENTICATED);
+        }
+
+        return signedJWT;
+    }
+
     // 1. By default, OAuth2 systems store role information in the "scope" claim within the JWT payload.
     //    - The "scope" claim contains a space-separated list of roles assigned to the user.
     //    - When decoding the token, Spring Security extracts these roles and maps them into the user's granted authorities.
@@ -82,6 +118,7 @@ public class AuthenticationService {
                 .issuer("identity-service")
                 .issueTime(new Date())
                 .expirationTime(new Date(Instant.now().plus(1, ChronoUnit.HOURS).toEpochMilli()))
+                .jwtID(UUID.randomUUID().toString())
                 .claim("scope", buildScope(user))
                 .build();
         Payload payload = new Payload(jwsClaimSet.toJSONObject());
