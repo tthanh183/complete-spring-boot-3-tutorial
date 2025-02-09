@@ -1,7 +1,8 @@
 package com.example.identityservice.configuration;
 
+import com.example.identityservice.entity.Role;
 import com.example.identityservice.entity.User;
-import com.example.identityservice.enums.Role;
+import com.example.identityservice.enums.RoleEnum;
 import com.example.identityservice.repository.UserRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,12 +23,14 @@ public class ApplicationInitConfig {
     ApplicationRunner applicationRunner(UserRepository userRepository) {
         return args -> {
             if(userRepository.findByUsername("admin").isEmpty()) {
-                var roles = new HashSet<String>();
-                roles.add(Role.ADMIN.name());
+                HashSet<Role> roles = new HashSet<>();
+                Role role = Role.builder()
+                        .name(RoleEnum.ADMIN.name())
+                        .build();
                 User user = User.builder()
                         .username("admin")
                         .password(passwordEncoder.encode("admin"))
-//                        .roles(roles)
+                        .roles(roles)
                         .build();
 
                 userRepository.save(user);
