@@ -27,6 +27,7 @@ public class ApplicationInitConfig {
                 Role role = Role.builder()
                         .name(RoleEnum.ADMIN.name())
                         .build();
+                roles.add(role);
                 User user = User.builder()
                         .username("admin")
                         .password(passwordEncoder.encode("admin"))

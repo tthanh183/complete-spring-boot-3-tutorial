@@ -13,6 +13,8 @@ import java.util.Set;
 @Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class UserResponse {
+    String id;
+    String response;
     String username;
     String password;
     String firstName;

@@ -28,7 +28,7 @@ public class SecurityConfig {
             "/auth/token",
             "/auth/introspect",
             "/auth/refresh",
-            "/auth/logout"
+            "/auth/logout",
     };
 
     @Value("${jwt.signerKey}")
